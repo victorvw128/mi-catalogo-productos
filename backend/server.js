@@ -91,23 +91,29 @@ app.post('/api/products/import-excel', uploadMemory.single('file'), async (req, 
 
 // 2. OBTENER Y BUSCAR PRODUCTOS
 
+// Obtener todos los productos (con soporte para búsqueda)
 app.get('/api/products', async (req, res) => {
   try {
     const { search } = req.query;
     let query = {};
-    if (search) {
+
+    // Filtro flexible por código, nombre o departamento
+    if (search && search.trim() !== '') {
+      const regex = new RegExp(search.trim(), 'i');
       query = {
         $or: [
-          { nombre: { $regex: search, $options: 'i' } },
-          { codigo: { $regex: search, $options: 'i' } },
-          { departamento: { $regex: search, $options: 'i' } }
+          { codigo: regex },
+          { nombre: regex },
+          { departamento: regex }
         ]
       };
     }
-    const products = await Product.find(query).limit(100);
+
+    const products = await Product.find(query).sort({ nombre: 1 });
     res.json(products);
   } catch (error) {
-    res.status(500).json({ error: 'Error al consultar productos' });
+    console.error('Error al obtener productos:', error);
+    res.status(500).json({ error: 'Error al consultar la base de datos', details: error.message });
   }
 });
 
