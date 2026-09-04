@@ -11,31 +11,35 @@ export default function GestionProductos() {
   const API_URL = 'https://mi-catalogo-productos.onrender.com/api';
 
   const fetchProducts = async (search = '') => {
-  setLoading(true);
-  try {
-    const res = await fetch(`${API_URL}/products?search=${encodeURIComponent(search)}`);
-    const data = await res.json();
-    
-    console.log('Respuesta completa del backend:', data);
+    setLoading(true);
+    try {
+      const cleanSearch = search.trim();
+      const endpoint = cleanSearch
+        ? `${API_URL}/products?search=${encodeURIComponent(cleanSearch)}`
+        : `${API_URL}/products`;
 
-    // Extrae el arreglo sin importar cómo lo entregue el servidor
-    let listaProductos = [];
-    if (Array.isArray(data)) {
-      listaProductos = data;
-    } else if (Array.isArray(data.products)) {
-      listaProductos = data.products;
-    } else if (Array.isArray(data.data)) {
-      listaProductos = data.data;
+      const res = await fetch(endpoint);
+      const data = await res.json();
+      
+      console.log('Respuesta completa del backend:', data);
+
+      let listaProductos = [];
+      if (Array.isArray(data)) {
+        listaProductos = data;
+      } else if (Array.isArray(data.products)) {
+        listaProductos = data.products;
+      } else if (Array.isArray(data.data)) {
+        listaProductos = data.data;
+      }
+
+      setProducts(listaProductos);
+    } catch (err) {
+      console.error('Error al cargar productos:', err);
+      setProducts([]);
+    } finally {
+      setLoading(false);
     }
-
-    setProducts(listaProductos);
-  } catch (err) {
-    console.error('Error al cargar productos:', err);
-    setProducts([]);
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
@@ -103,7 +107,6 @@ export default function GestionProductos() {
     }
   };
 
-  // Helper para formatear precios sin romper la app si son undefined
   const formatPrice = (val) => {
     const num = Number(val);
     return isNaN(num) ? '0.00' : num.toFixed(2);
