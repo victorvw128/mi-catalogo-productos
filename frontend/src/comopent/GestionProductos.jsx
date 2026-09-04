@@ -35,28 +35,42 @@ export default function GestionProductos() {
   }, [searchTerm]);
 
   // Importar archivo Excel (inv.xlsx) a MongoDB
-  const handleExcelImport = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
+const handleExcelImport = async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
 
-    const formData = new FormData();
-    formData.append('file', file);
+  const formData = new FormData();
+  formData.append('file', file);
 
-    try {
-      setLoading(true);
-      const res = await fetch(`${API_URL}/api/products/import-excel`, {
-        method: 'POST',
-        body: formData,
-      });
-      const data = await res.json();
-      alert(data.message || 'Importación completada');
-      fetchProducts(searchTerm);
-    } catch (err) {
-      alert('Error al importar el archivo Excel');
-    } finally {
-      setLoading(false);
+  try {
+    setLoading(true);
+
+    // Aseguramos la URL exacta hacia la ruta de Render
+    const res = await fetch('https://mi-catalogo-productos.onrender.com/api/products/import-excel', {
+      method: 'POST',
+      body: formData,
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      throw new Error(data.error || data.details || 'Error al procesar la importación');
     }
-  };
+
+    alert(data.message || 'Importación completada con éxito');
+    
+    if (typeof fetchProducts === 'function') {
+      fetchProducts(searchTerm);
+    }
+  } catch (err) {
+    console.error('Error detallado de importación:', err);
+    alert(`Error: ${err.message}`);
+  } finally {
+    setLoading(false);
+    // Limpiar el input file para permitir re-subir el mismo archivo si es necesario
+    e.target.value = '';
+  }
+};
 
   // Subir foto desde la cámara o galería
   const handleImageUpload = async (productId, e) => {
