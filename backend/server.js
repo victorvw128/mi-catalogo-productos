@@ -32,7 +32,7 @@ app.post('/api/products/import-excel', uploadMemory.single('file'), async (req, 
     const sheetName = workbook.SheetNames[0];
     const rawData = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
 
-    // Función auxiliar para convertir valores de moneda "$7.50" a números (7.50)
+    // Helper para limpiar precios/monedas
     const parseCurrency = (val) => {
       if (typeof val === 'number') return val;
       if (typeof val === 'string') {
@@ -42,29 +42,50 @@ app.post('/api/products/import-excel', uploadMemory.single('file'), async (req, 
       return 0;
     };
 
-    const operations = rawData.map(item => ({
-      updateOne: {
-        filter: { codigo: String(item['Código'] || item.codigo || '').trim() },
-        update: {
-          $set: {
-            codigo: String(item['Código'] || item.codigo || '').trim(),
-            nombre: String(item['Producto'] || item.nombre || '').trim(),
-            precioCosto: parseCurrency(item['P. Costo']),
-            precioVenta: parseCurrency(item['P. Venta']),
-            precioMayoreo: parseCurrency(item['P. Mayoreo']),
-            existencia: parseCurrency(item['Existencia']),
-            departamento: item['Departamento'] || 'Sin Departamento',
-          }
-        },
-        upsert: true
-      }
-    }));
+    // Filtrar filas válidas que contengan un código no vacío
+    const validRows = rawData.filter(item => {
+      const code = item['Código'] || item['Codigo'] || item['codigo'] || item['CODIGO'];
+      return code !== undefined && String(code).trim() !== '';
+    });
+
+    if (validRows.length === 0) {
+      return res.status(400).json({ 
+        error: 'No se encontraron filas válidas con un "Código" en el archivo Excel.' 
+      });
+    }
+
+    const operations = validRows.map(item => {
+      const codigoVal = String(item['Código'] || item['Codigo'] || item['codigo'] || item['CODIGO']).trim();
+      const nombreVal = String(item['Producto'] || item['producto'] || item['nombre'] || item['Nombre'] || '').trim();
+
+      return {
+        updateOne: {
+          filter: { codigo: codigoVal },
+          update: {
+            $set: {
+              codigo: codigoVal,
+              nombre: nombreVal,
+              precioCosto: parseCurrency(item['P. Costo'] || item['precioCosto'] || item['P.Costo']),
+              precioVenta: parseCurrency(item['P. Venta'] || item['precioVenta'] || item['P.Venta']),
+              precioMayoreo: parseCurrency(item['P. Mayoreo'] || item['precioMayoreo'] || item['P.Mayoreo']),
+              existencia: parseCurrency(item['Existencia'] || item['existencia'] || item['Cantidad']),
+              departamento: String(item['Departamento'] || item['departamento'] || 'Sin Departamento').trim(),
+            }
+          },
+          upsert: true
+        }
+      };
+    });
 
     await Product.bulkWrite(operations);
-    res.json({ message: 'Productos de inv.xlsx importados con éxito', total: operations.length });
+    res.json({ message: 'Productos importados con éxito', total: operations.length });
+
   } catch (error) {
-    console.error('Error al importar:', error);
-    res.status(500).json({ error: 'Error al procesar el archivo Excel', details: error.message });
+    console.error('Error al importar Excel:', error);
+    res.status(500).json({ 
+      error: 'Error al procesar el archivo Excel', 
+      details: error.message 
+    });
   }
 });
 
