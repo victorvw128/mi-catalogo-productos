@@ -10,7 +10,7 @@ export default function GestionProductos() {
   const [uploadingId, setUploadingId] = useState(null);
   const [selectedProduct, setSelectedProduct] = useState(null);
 
-  const API_URL = process.env.REACT_APP_API_URL || 'https://mi-catalogo-productos.onrender.com';
+  const API_URL = 'https://mi-catalogo-productos.onrender.com';
 
   const fetchProducts = async (search = '') => {
     setLoading(true);
