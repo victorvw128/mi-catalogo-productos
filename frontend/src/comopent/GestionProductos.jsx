@@ -11,29 +11,31 @@ export default function GestionProductos() {
   const API_URL = 'https://mi-catalogo-productos.onrender.com/api';
 
   const fetchProducts = async (search = '') => {
-    setLoading(true);
-    try {
-      const res = await fetch(`${API_URL}/products?search=${encodeURIComponent(search)}`);
-      const data = await res.json();
-      
-      console.log('Datos recibidos:', data);
+  setLoading(true);
+  try {
+    const res = await fetch(`${API_URL}/products?search=${encodeURIComponent(search)}`);
+    const data = await res.json();
+    
+    console.log('Respuesta completa del backend:', data);
 
-      if (Array.isArray(data)) {
-        setProducts(data);
-      } else if (data && Array.isArray(data.products)) {
-        setProducts(data.products);
-      } else if (data && Array.isArray(data.data)) {
-        setProducts(data.data);
-      } else {
-        setProducts([]);
-      }
-    } catch (err) {
-      console.error('Error al cargar productos:', err);
-      setProducts([]);
-    } finally {
-      setLoading(false);
+    // Extrae el arreglo sin importar cómo lo entregue el servidor
+    let listaProductos = [];
+    if (Array.isArray(data)) {
+      listaProductos = data;
+    } else if (Array.isArray(data.products)) {
+      listaProductos = data.products;
+    } else if (Array.isArray(data.data)) {
+      listaProductos = data.data;
     }
-  };
+
+    setProducts(listaProductos);
+  } catch (err) {
+    console.error('Error al cargar productos:', err);
+    setProducts([]);
+  } finally {
+    setLoading(false);
+  }
+};
 
   useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
