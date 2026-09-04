@@ -14,11 +14,12 @@ app.use(express.json({ limit: '10mb' }));
 const storage = multer.memoryStorage();
 const upload = multer({ storage });
 
-// Conexión a MongoDB
-mongoose.connect(process.env.MONGO_URI)
-  .then(() => console.log('MongoDB conectado exitosamente'))
+/// Conexión a MongoDB especificando la base de datos 'test'
+mongoose.connect(process.env.MONGO_URI, {
+  dbName: 'test'
+})
+  .then(() => console.log('MongoDB conectado exitosamente a la base de datos: test'))
   .catch((err) => console.error('Error al conectar a MongoDB:', err));
-
 // 1. IMPORTAR PRODUCTOS DESDE EXCEL A MONGODB
 app.post('/api/products/import-excel', upload.single('file'), async (req, res) => {
   try {
