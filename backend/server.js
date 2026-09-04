@@ -8,23 +8,19 @@ const Product = require('./models/Product');
 
 const app = express();
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 
-// Configuración de Multer para recibir archivos (Excel e Imágenes)
+// Configuración única de Multer
 const storage = multer.memoryStorage();
 const upload = multer({ storage });
-const uploadMemory = multer({ storage: multer.memoryStorage() });
+
 // Conexión a MongoDB
-
-
-
 mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log('MongoDB conectado exitosamente'))
   .catch((err) => console.error('Error al conectar a MongoDB:', err));
 
 // 1. IMPORTAR PRODUCTOS DESDE EXCEL A MONGODB
-// ENDPOINT PARA IMPORTAR EXCEL (inv.xlsx)
-app.post('/api/products/import-excel', uploadMemory.single('file'), async (req, res) => {
+app.post('/api/products/import-excel', upload.single('file'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No se subió ningún archivo' });
 
@@ -32,7 +28,6 @@ app.post('/api/products/import-excel', uploadMemory.single('file'), async (req, 
     const sheetName = workbook.SheetNames[0];
     const rawData = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
 
-    // Helper para limpiar precios/monedas
     const parseCurrency = (val) => {
       if (typeof val === 'number') return val;
       if (typeof val === 'string') {
@@ -42,7 +37,6 @@ app.post('/api/products/import-excel', uploadMemory.single('file'), async (req, 
       return 0;
     };
 
-    // Filtrar filas válidas que contengan un código no vacío
     const validRows = rawData.filter(item => {
       const code = item['Código'] || item['Codigo'] || item['codigo'] || item['CODIGO'];
       return code !== undefined && String(code).trim() !== '';
@@ -90,19 +84,18 @@ app.post('/api/products/import-excel', uploadMemory.single('file'), async (req, 
 });
 
 // 2. OBTENER Y BUSCAR PRODUCTOS
-
-// Obtener todos los productos (con soporte para búsqueda)
 app.get('/api/products', async (req, res) => {
   try {
     const { search } = req.query;
     let query = {};
 
-    if (search) {
+    if (search && search.trim() !== '') {
+      const cleanSearch = search.trim();
       query = {
         $or: [
-          { nombre: { $regex: search, $options: 'i' } },
-          { codigo: { $regex: search, $options: 'i' } },
-          { departamento: { $regex: search, $options: 'i' } }
+          { nombre: { $regex: cleanSearch, $options: 'i' } },
+          { codigo: { $regex: cleanSearch, $options: 'i' } },
+          { departamento: { $regex: cleanSearch, $options: 'i' } }
         ]
       };
     }
@@ -110,10 +103,36 @@ app.get('/api/products', async (req, res) => {
     const products = await Product.find(query).sort({ createdAt: -1 });
     res.json(products);
   } catch (err) {
+    console.error('Error al obtener productos:', err);
     res.status(500).json({ error: 'Error al consultar productos' });
   }
 });
-// 3. ACTUALIZAR IMAGEN / DATOS DE UN PRODUCTO
+
+// 3. SUBIR IMAGEN DE PRODUCTO
+app.post('/api/products/:id/upload-image', upload.single('imagen'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!req.file) return res.status(400).json({ error: 'No se recibió ninguna imagen' });
+
+    const mimeType = req.file.mimetype;
+    const base64Image = `data:${mimeType};base64,${req.file.buffer.toString('base64')}`;
+
+    const product = await Product.findByIdAndUpdate(
+      id,
+      { imagen: base64Image },
+      { new: true }
+    );
+
+    if (!product) return res.status(404).json({ error: 'Producto no encontrado' });
+
+    res.json({ message: 'Imagen actualizada exitosamente', product });
+  } catch (error) {
+    console.error('Error al subir imagen:', error);
+    res.status(500).json({ error: 'Error al guardar la imagen' });
+  }
+});
+
+// 4. ACTUALIZAR DATOS DE UN PRODUCTO
 app.put('/api/products/:id', async (req, res) => {
   try {
     const { id } = req.params;
@@ -131,4 +150,5 @@ app.put('/api/products/:id', async (req, res) => {
   }
 });
 
-app.listen(5000, () => console.log('Servidor corriendo en puerto 5000'));
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => console.log(`Servidor corriendo en puerto ${PORT}`));
