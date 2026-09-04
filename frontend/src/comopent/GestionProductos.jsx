@@ -10,7 +10,7 @@ export default function GestionProductos() {
   // Estado para el producto seleccionado en el modal
   const [selectedProduct, setSelectedProduct] = useState(null);
 
-  const API_URL = 'http://localhost:5000';
+  const API_URL = 'https://mi-catalogo-productos.onrender.com/api';
 
   // Cargar productos desde MongoDB
   const fetchProducts = async (search = '') => {
