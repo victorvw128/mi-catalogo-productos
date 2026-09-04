@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Upload, Camera, Loader, X, Info } from 'lucide-react';
 
+import React, { useState, useEffect } from 'react';
+
 export default function GestionProductos() {
   const [products, setProducts] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -8,15 +10,16 @@ export default function GestionProductos() {
   const [uploadingId, setUploadingId] = useState(null);
   const [selectedProduct, setSelectedProduct] = useState(null);
 
-  const API_URL = 'https://mi-catalogo-productos.onrender.com/api';
+  const API_URL = process.env.REACT_APP_API_URL || 'https://mi-catalogo-productos.onrender.com';
 
   const fetchProducts = async (search = '') => {
     setLoading(true);
     try {
       const cleanSearch = search.trim();
+      // 1. Agregado /api antes de /products
       const endpoint = cleanSearch
-        ? `${API_URL}/products?search=${encodeURIComponent(cleanSearch)}`
-        : `${API_URL}/products`;
+        ? `${API_URL}/api/products?search=${encodeURIComponent(cleanSearch)}`
+        : `${API_URL}/api/products`;
 
       const res = await fetch(endpoint);
       const data = await res.json();
@@ -58,7 +61,8 @@ export default function GestionProductos() {
 
     try {
       setLoading(true);
-      const res = await fetch(`${API_URL}/products/import-excel`, {
+      // 2. Agregado /api en la importación de Excel
+      const res = await fetch(`${API_URL}/api/products/import-excel`, {
         method: 'POST',
         body: formData,
       });
@@ -86,7 +90,8 @@ export default function GestionProductos() {
 
     try {
       setUploadingId(productId);
-      const res = await fetch(`${API_URL}/products/${productId}/upload-image`, {
+      // 3. Agregado /api en la subida de imágenes
+      const res = await fetch(`${API_URL}/api/products/${productId}/upload-image`, {
         method: 'POST',
         body: formData,
       });
