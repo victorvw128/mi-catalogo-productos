@@ -12,13 +12,17 @@ export default function GestionProductos() {
 
   const API_URL = 'https://mi-catalogo-productos.onrender.com/api';
 
-  // Cargar productos desde MongoDB
   const fetchProducts = async (search = '') => {
     setLoading(true);
     try {
-      const res = await fetch(`${API_URL}/api/products?search=${search}`);
+      const res = await fetch(`${API_URL}/products?search=${search}`);
       const data = await res.json();
-      setProducts(data);
+      
+      if (Array.isArray(data)) {
+        setProducts(data);
+      } else {
+        console.error('La respuesta no es un arreglo:', data);
+      }
     } catch (err) {
       console.error('Error al cargar productos:', err);
     } finally {
@@ -35,42 +39,40 @@ export default function GestionProductos() {
   }, [searchTerm]);
 
   // Importar archivo Excel (inv.xlsx) a MongoDB
-const handleExcelImport = async (e) => {
-  const file = e.target.files[0];
-  if (!file) return;
+  const handleExcelImport = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
 
-  const formData = new FormData();
-  formData.append('file', file);
+    const formData = new FormData();
+    formData.append('file', file);
 
-  try {
-    setLoading(true);
+    try {
+      setLoading(true);
 
-    // Aseguramos la URL exacta hacia la ruta de Render
-    const res = await fetch('https://mi-catalogo-productos.onrender.com/api/products/import-excel', {
-      method: 'POST',
-      body: formData,
-    });
+      const res = await fetch(`${API_URL}/products/import-excel`, {
+        method: 'POST',
+        body: formData,
+      });
 
-    const data = await res.json();
+      const data = await res.json();
 
-    if (!res.ok) {
-      throw new Error(data.error || data.details || 'Error al procesar la importación');
+      if (!res.ok) {
+        throw new Error(data.error || data.details || 'Error al procesar la importación');
+      }
+
+      alert(data.message || 'Importación completada con éxito');
+      
+      if (typeof fetchProducts === 'function') {
+        fetchProducts(searchTerm);
+      }
+    } catch (err) {
+      console.error('Error detallado de importación:', err);
+      alert(`Error: ${err.message}`);
+    } finally {
+      setLoading(false);
+      e.target.value = '';
     }
-
-    alert(data.message || 'Importación completada con éxito');
-    
-    if (typeof fetchProducts === 'function') {
-      fetchProducts(searchTerm);
-    }
-  } catch (err) {
-    console.error('Error detallado de importación:', err);
-    alert(`Error: ${err.message}`);
-  } finally {
-    setLoading(false);
-    // Limpiar el input file para permitir re-subir el mismo archivo si es necesario
-    e.target.value = '';
-  }
-};
+  };
 
   // Subir foto desde la cámara o galería
   const handleImageUpload = async (productId, e) => {
@@ -83,7 +85,9 @@ const handleExcelImport = async (e) => {
 
     try {
       setUploadingId(productId);
-      const res = await fetch(`${API_URL}/api/products/${productId}/upload-image`, {
+      
+      // FIX: Se removió /api redundante de la ruta
+      const res = await fetch(`${API_URL}/products/${productId}/upload-image`, {
         method: 'POST',
         body: formData,
       });
@@ -91,6 +95,7 @@ const handleExcelImport = async (e) => {
       if (res.ok) {
         const updated = await res.json();
         fetchProducts(searchTerm);
+        
         // Actualiza el modal si el producto activo es el mismo
         if (selectedProduct && selectedProduct._id === productId) {
           setSelectedProduct(updated.product || { ...selectedProduct, imagen: updated.imagen });
@@ -143,7 +148,7 @@ const handleExcelImport = async (e) => {
             <div
               key={prod._id}
               style={styles.card}
-              onClick={() => setSelectedProduct(prod)} // Al hacer clic abre los detalles
+              onClick={() => setSelectedProduct(prod)}
             >
               <div style={styles.imageContainer}>
                 {prod.imagen ? (
