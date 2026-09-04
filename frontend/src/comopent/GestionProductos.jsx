@@ -6,8 +6,6 @@ export default function GestionProductos() {
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
   const [uploadingId, setUploadingId] = useState(null);
-  
-  // Estado para el producto seleccionado en el modal
   const [selectedProduct, setSelectedProduct] = useState(null);
 
   const API_URL = 'https://mi-catalogo-productos.onrender.com/api';
@@ -15,16 +13,23 @@ export default function GestionProductos() {
   const fetchProducts = async (search = '') => {
     setLoading(true);
     try {
-      const res = await fetch(`${API_URL}/products?search=${search}`);
+      const res = await fetch(`${API_URL}/products?search=${encodeURIComponent(search)}`);
       const data = await res.json();
       
+      console.log('Datos recibidos:', data);
+
       if (Array.isArray(data)) {
         setProducts(data);
+      } else if (data && Array.isArray(data.products)) {
+        setProducts(data.products);
+      } else if (data && Array.isArray(data.data)) {
+        setProducts(data.data);
       } else {
-        console.error('La respuesta no es un arreglo:', data);
+        setProducts([]);
       }
     } catch (err) {
       console.error('Error al cargar productos:', err);
+      setProducts([]);
     } finally {
       setLoading(false);
     }
@@ -38,9 +43,8 @@ export default function GestionProductos() {
     return () => clearTimeout(delayDebounceFn);
   }, [searchTerm]);
 
-  // Importar archivo Excel (inv.xlsx) a MongoDB
   const handleExcelImport = async (e) => {
-    const file = e.target.files[0];
+    const file = e.target.files?.[0];
     if (!file) return;
 
     const formData = new FormData();
@@ -48,25 +52,17 @@ export default function GestionProductos() {
 
     try {
       setLoading(true);
-
       const res = await fetch(`${API_URL}/products/import-excel`, {
         method: 'POST',
         body: formData,
       });
 
       const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Error en la importación');
 
-      if (!res.ok) {
-        throw new Error(data.error || data.details || 'Error al procesar la importación');
-      }
-
-      alert(data.message || 'Importación completada con éxito');
-      
-      if (typeof fetchProducts === 'function') {
-        fetchProducts(searchTerm);
-      }
+      alert(data.message || 'Importación exitosa');
+      fetchProducts(searchTerm);
     } catch (err) {
-      console.error('Error detallado de importación:', err);
       alert(`Error: ${err.message}`);
     } finally {
       setLoading(false);
@@ -74,10 +70,9 @@ export default function GestionProductos() {
     }
   };
 
-  // Subir foto desde la cámara o galería
   const handleImageUpload = async (productId, e) => {
-    e.stopPropagation(); // Evita abrir el modal al presionar el botón de la cámara
-    const file = e.target.files[0];
+    e.stopPropagation();
+    const file = e.target.files?.[0];
     if (!file) return;
 
     const formData = new FormData();
@@ -85,8 +80,6 @@ export default function GestionProductos() {
 
     try {
       setUploadingId(productId);
-      
-      // FIX: Se removió /api redundante de la ruta
       const res = await fetch(`${API_URL}/products/${productId}/upload-image`, {
         method: 'POST',
         body: formData,
@@ -95,8 +88,6 @@ export default function GestionProductos() {
       if (res.ok) {
         const updated = await res.json();
         fetchProducts(searchTerm);
-        
-        // Actualiza el modal si el producto activo es el mismo
         if (selectedProduct && selectedProduct._id === productId) {
           setSelectedProduct(updated.product || { ...selectedProduct, imagen: updated.imagen });
         }
@@ -110,11 +101,16 @@ export default function GestionProductos() {
     }
   };
 
+  // Helper para formatear precios sin romper la app si son undefined
+  const formatPrice = (val) => {
+    const num = Number(val);
+    return isNaN(num) ? '0.00' : num.toFixed(2);
+  };
+
   return (
     <div style={styles.container}>
       <h1 style={styles.title}>Gestión de Catálogo</h1>
 
-      {/* Botón para subir el Excel */}
       <div style={styles.topBar}>
         <label style={styles.uploadBtn}>
           <Upload size={18} style={{ marginRight: '8px' }} />
@@ -128,7 +124,6 @@ export default function GestionProductos() {
         </label>
       </div>
 
-      {/* Buscador */}
       <div style={styles.searchBox}>
         <Search size={20} style={styles.searchIcon} />
         <input
@@ -144,64 +139,64 @@ export default function GestionProductos() {
         <p style={{ textAlign: 'center' }}>Cargando catálogo...</p>
       ) : (
         <div style={styles.grid}>
-          {products.map((prod) => (
-            <div
-              key={prod._id}
-              style={styles.card}
-              onClick={() => setSelectedProduct(prod)}
-            >
-              <div style={styles.imageContainer}>
-                {prod.imagen ? (
-                  <img src={prod.imagen} alt={prod.nombre} style={styles.productImg} />
-                ) : (
-                  <div style={styles.noImg}>Sin foto</div>
-                )}
-              </div>
-
-              <div style={styles.cardContent}>
-                <span style={styles.code}>{prod.codigo}</span>
-                <h3 style={styles.prodTitle}>{prod.nombre}</h3>
-                <p style={styles.department}>{prod.departamento}</p>
-
-                <div style={styles.priceRow}>
-                  <div>
-                    <span style={styles.priceLabel}>P. Venta: </span>
-                    <span style={styles.price}>
-                      ${prod.precioVenta ? prod.precioVenta.toFixed(2) : '0.00'}
-                    </span>
-                  </div>
-                  <div>
-                    <span style={styles.priceLabel}>Mayoreo: </span>
-                    <span style={styles.subPrice}>
-                      ${prod.precioMayoreo ? prod.precioMayoreo.toFixed(2) : '0.00'}
-                    </span>
-                  </div>
+          {Array.isArray(products) && products.length > 0 ? (
+            products.map((prod) => (
+              <div
+                key={prod?._id || Math.random()}
+                style={styles.card}
+                onClick={() => setSelectedProduct(prod)}
+              >
+                <div style={styles.imageContainer}>
+                  {prod?.imagen ? (
+                    <img src={prod.imagen} alt={prod?.nombre || 'Producto'} style={styles.productImg} />
+                  ) : (
+                    <div style={styles.noImg}>Sin foto</div>
+                  )}
                 </div>
 
-                <p style={styles.stock}>Existencia: <strong>{prod.existencia}</strong></p>
+                <div style={styles.cardContent}>
+                  <span style={styles.code}>{prod?.codigo || 'S/C'}</span>
+                  <h3 style={styles.prodTitle}>{prod?.nombre || 'Sin nombre'}</h3>
+                  <p style={styles.department}>{prod?.departamento || 'General'}</p>
 
-                {/* Botón para tomar/subir foto */}
-                <label style={styles.cameraBtn} onClick={(e) => e.stopPropagation()}>
-                  {uploadingId === prod._id ? (
-                    <Loader size={16} className="animate-spin" style={{ marginRight: '6px' }} />
-                  ) : (
-                    <Camera size={16} style={{ marginRight: '6px' }} />
-                  )}
-                  {uploadingId === prod._id ? 'Subiendo...' : 'Subir / Tomar Foto'}
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => handleImageUpload(prod._id, e)}
-                    hidden
-                  />
-                </label>
+                  <div style={styles.priceRow}>
+                    <div>
+                      <span style={styles.priceLabel}>P. Venta: </span>
+                      <span style={styles.price}>${formatPrice(prod?.precioVenta)}</span>
+                    </div>
+                    <div>
+                      <span style={styles.priceLabel}>Mayoreo: </span>
+                      <span style={styles.subPrice}>${formatPrice(prod?.precioMayoreo)}</span>
+                    </div>
+                  </div>
+
+                  <p style={styles.stock}>Existencia: <strong>{prod?.existencia ?? 0}</strong></p>
+
+                  <label style={styles.cameraBtn} onClick={(e) => e.stopPropagation()}>
+                    {uploadingId === prod?._id ? (
+                      <Loader size={16} className="animate-spin" style={{ marginRight: '6px' }} />
+                    ) : (
+                      <Camera size={16} style={{ marginRight: '6px' }} />
+                    )}
+                    {uploadingId === prod?._id ? 'Subiendo...' : 'Subir / Tomar Foto'}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => handleImageUpload(prod?._id, e)}
+                      hidden
+                    />
+                  </label>
+                </div>
               </div>
-            </div>
-          ))}
+            ))
+          ) : (
+            <p style={{ textAlign: 'center', gridColumn: '1 / -1', color: '#6b7280' }}>
+              No se encontraron productos.
+            </p>
+          )}
         </div>
       )}
 
-      {/* --- MODAL CON MÁS INFORMACIÓN DEL PRODUCTO SELECCIONADO --- */}
       {selectedProduct && (
         <div style={styles.modalOverlay} onClick={() => setSelectedProduct(null)}>
           <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
@@ -230,7 +225,7 @@ export default function GestionProductos() {
 
               <div style={styles.detailItem}>
                 <span style={styles.detailLabel}>Nombre del Producto:</span>
-                <span style={styles.detailValue}>{selectedProduct.nombre}</span>
+                <span style={styles.detailValue}>{selectedProduct.nombre || 'N/A'}</span>
               </div>
 
               <div style={styles.detailItem}>
@@ -240,29 +235,29 @@ export default function GestionProductos() {
 
               <div style={styles.detailItem}>
                 <span style={styles.detailLabel}>Existencia (Stock):</span>
-                <span style={{ ...styles.detailValue, color: selectedProduct.existencia > 0 ? '#059669' : '#dc2626' }}>
-                  {selectedProduct.existencia} unidades
+                <span style={{ ...styles.detailValue, color: (selectedProduct.existencia || 0) > 0 ? '#059669' : '#dc2626' }}>
+                  {selectedProduct.existencia ?? 0} unidades
                 </span>
               </div>
 
               <div style={{ ...styles.detailItem, backgroundColor: '#fef2f2', borderColor: '#fecaca' }}>
                 <span style={{ ...styles.detailLabel, color: '#991b1b' }}>Precio de Compra:</span>
                 <span style={{ ...styles.detailValue, color: '#dc2626', fontSize: '18px' }}>
-                  ${selectedProduct.precioCosto ? selectedProduct.precioCosto.toFixed(2) : (selectedProduct.costo ? selectedProduct.costo.toFixed(2) : '0.00')}
+                  ${formatPrice(selectedProduct.precioCosto || selectedProduct.costo)}
                 </span>
               </div>
 
               <div style={styles.detailItem}>
                 <span style={styles.detailLabel}>Precio de Venta:</span>
                 <span style={{ ...styles.detailValue, color: '#2563eb', fontSize: '18px' }}>
-                  ${selectedProduct.precioVenta ? selectedProduct.precioVenta.toFixed(2) : '0.00'}
+                  ${formatPrice(selectedProduct.precioVenta)}
                 </span>
               </div>
 
               <div style={styles.detailItem}>
                 <span style={styles.detailLabel}>Precio Mayoreo:</span>
                 <span style={{ ...styles.detailValue, color: '#059669', fontSize: '18px' }}>
-                  ${selectedProduct.precioMayoreo ? selectedProduct.precioMayoreo.toFixed(2) : '0.00'}
+                  ${formatPrice(selectedProduct.precioMayoreo)}
                 </span>
               </div>
             </div>
@@ -282,7 +277,7 @@ const styles = {
   searchIcon: { position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#9ca3af' },
   searchInput: { width: '100%', padding: '12px 12px 12px 40px', borderRadius: '8px', border: '1px solid #d1d5db', fontSize: '16px', boxSizing: 'border-box' },
   grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '20px' },
-  card: { border: '1px solid #e5e7eb', borderRadius: '12px', overflow: 'hidden', backgroundColor: '#fff', boxShadow: '0 2px 8px rgba(0,0,0,0.05)', cursor: 'pointer', transition: 'transform 0.15s ease' },
+  card: { border: '1px solid #e5e7eb', borderRadius: '12px', overflow: 'hidden', backgroundColor: '#fff', boxShadow: '0 2px 8px rgba(0,0,0,0.05)', cursor: 'pointer' },
   imageContainer: { height: '160px', backgroundColor: '#f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'center' },
   productImg: { width: '100%', height: '100%', objectFit: 'cover' },
   noImg: { color: '#9ca3af', fontSize: '14px' },
@@ -296,8 +291,6 @@ const styles = {
   subPrice: { fontSize: '13px', fontWeight: 'bold', color: '#059669' },
   stock: { fontSize: '12px', color: '#374151', marginBottom: '12px' },
   cameraBtn: { display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '8px', backgroundColor: '#2563eb', color: '#fff', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: 'bold' },
-
-  /* --- ESTILOS DEL MODAL DETALLES --- */
   modalOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0, 0, 0, 0.6)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '16px' },
   modalContent: { backgroundColor: '#fff', borderRadius: '12px', width: '100%', maxWidth: '500px', padding: '24px', position: 'relative', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)', maxHeight: '90vh', overflowY: 'auto' },
   closeBtn: { position: 'absolute', top: '16px', right: '16px', background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280' },
