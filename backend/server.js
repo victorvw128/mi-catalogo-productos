@@ -97,26 +97,22 @@ app.get('/api/products', async (req, res) => {
     const { search } = req.query;
     let query = {};
 
-    // Filtro flexible por código, nombre o departamento
-    if (search && search.trim() !== '') {
-      const regex = new RegExp(search.trim(), 'i');
+    if (search) {
       query = {
         $or: [
-          { codigo: regex },
-          { nombre: regex },
-          { departamento: regex }
+          { nombre: { $regex: search, $options: 'i' } },
+          { codigo: { $regex: search, $options: 'i' } },
+          { departamento: { $regex: search, $options: 'i' } }
         ]
       };
     }
 
-    const products = await Product.find(query).sort({ nombre: 1 });
+    const products = await Product.find(query).sort({ createdAt: -1 });
     res.json(products);
-  } catch (error) {
-    console.error('Error al obtener productos:', error);
-    res.status(500).json({ error: 'Error al consultar la base de datos', details: error.message });
+  } catch (err) {
+    res.status(500).json({ error: 'Error al consultar productos' });
   }
 });
-
 // 3. ACTUALIZAR IMAGEN / DATOS DE UN PRODUCTO
 app.put('/api/products/:id', async (req, res) => {
   try {
