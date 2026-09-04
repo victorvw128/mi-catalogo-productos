@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
@@ -15,7 +16,9 @@ const upload = multer({ storage });
 const uploadMemory = multer({ storage: multer.memoryStorage() });
 // Conexión a MongoDB
 
-mongoose.connect('mongodb://127.0.0.1:27017/mi_tienda')
+
+
+mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log('MongoDB conectado exitosamente'))
   .catch((err) => console.error('Error al conectar a MongoDB:', err));
 
